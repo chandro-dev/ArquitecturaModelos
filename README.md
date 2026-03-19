@@ -52,6 +52,8 @@ npm run dev
 Servidor: `http://localhost:4000`
 
 Healthcheck: `GET /api/health`
+OpenAPI JSON: `GET /api/openapi.json`
+Swagger UI: `GET /api-docs`
 
 ## Seed inicial (roles + prompts)
 
@@ -89,6 +91,15 @@ npm run seed
 - `GET /api/interviews/:interviewId`
 - `GET /api/interviews/me/history?page=1&limit=10&status=completed`
 - `GET /api/interviews/me/progress`
+
+## Swagger / OpenAPI
+
+- Toda la documentacion esta en Swagger UI: `http://localhost:4000/api-docs`
+- Especificacion consumible por herramientas: `http://localhost:4000/api/openapi.json`
+- Desde Swagger puedes:
+  - Probar endpoints directamente.
+  - Configurar `Authorize` con `Bearer <JWT>`.
+  - Validar contratos request/response para Angular.
 
 ## Estructura de feedback guardada
 
