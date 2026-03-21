@@ -1,6 +1,6 @@
 # Interview Role-Play Simulator Backend
 
-Backend profesional en `Node.js + Express + MongoDB` para simular entrevistas de trabajo con IA (OpenAI o Gemini), guardar historial y calcular retroalimentación detallada.
+Backend profesional en `Node.js + Express + MongoDB` para simular entrevistas de trabajo con IA (Gemini), guardar historial y calcular retroalimentación detallada.
 
 ## Stack
 
@@ -8,7 +8,7 @@ Backend profesional en `Node.js + Express + MongoDB` para simular entrevistas de
 - Mongoose (MongoDB Atlas)
 - JWT + bcrypt (autenticación)
 - Zod (validación de payloads)
-- OpenAI / Gemini (proveedor IA configurable)
+- Gemini (Google Generative AI)
 
 ## Estructura
 
@@ -39,8 +39,8 @@ cp .env.example .env
 - `MONGODB_URI` (ya incluye tu conexión)
 - `MONGODB_DB_NAME=interviewapp`
 - `JWT_SECRET` largo y seguro
-- `AI_PROVIDER=openai` o `AI_PROVIDER=gemini`
-- API Key según proveedor elegido
+- `AI_PROVIDER=gemini`
+- `GEMINI_API_KEY` con tu API Key
 
 ## Ejecución
 
@@ -52,6 +52,11 @@ npm run dev
 Servidor: `http://localhost:4000`
 
 Healthcheck: `GET /api/health`
+
+Documentación Swagger:
+
+- UI: `GET /api/docs`
+- OpenAPI JSON: `GET /api/docs.json`
 
 ## Seed inicial (roles + prompts)
 
