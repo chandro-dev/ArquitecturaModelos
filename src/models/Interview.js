@@ -22,6 +22,14 @@ const messageSchema = new mongoose.Schema(
       type: String,
       default: null,
     },
+    sentiment: {
+      type: {
+        label: String, // "Seguro", "Dudoso", "Nervioso", "Neutral"
+        score: Number, // 0 a 100
+        tone: String   // Breve descripción
+      },
+      default: null
+    }
   },
   { _id: false }
 );
@@ -58,6 +66,14 @@ const feedbackSchema = new mongoose.Schema(
       type: String,
       default: "",
     },
+    sentimentSummary: {
+      type: {
+        predominantEmotion: String,
+        confidenceAverage: Number,
+        emotionalEvolution: [Number] // Histórico de scores
+      },
+      default: null
+    }
   },
   { _id: false }
 );
@@ -73,8 +89,16 @@ const interviewSchema = new mongoose.Schema(
     roleId: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "Role",
-      required: true,
+      required: false,
       index: true,
+    },
+    customJD: {
+      type: String,
+      default: null,
+    },
+    companyName: {
+      type: String,
+      default: null,
     },
     status: {
       type: String,

@@ -3,7 +3,17 @@ const Interview = require("../models/Interview");
 const Prompt = require("../models/Prompt");
 const Role = require("../models/Role");
 const AppError = require("../utils/AppError");
-const { generateInterviewReply, generateInterviewFeedback } = require("./ai.service");
+const { 
+  generateInterviewReply, 
+  generateInterviewFeedback,
+  generateSystemInstructionForJD,
+  generateInitialMessageForJD,
+  generateSentimentAnalysis,
+  generateSentimentSummary
+} = require("./ai.service");
+const User = require("../models/User");
+const { calculateLevel } = require("../utils/gamification");
+const { updateTaskProgress } = require("./task.service");
 
 const startInterview = async ({ userId, roleId, mode }) => {
   const [role, prompt] = await Promise.all([
@@ -31,6 +41,29 @@ const startInterview = async ({ userId, roleId, mode }) => {
   return Interview.findById(interview._id).populate("roleId", "title description tags difficulty");
 };
 
+const startCustomInterview = async ({ userId, customJD, companyName, mode }) => {
+  if (!customJD) throw new AppError("Job Description is required", 400);
+
+  const firstMessage = await generateInitialMessageForJD(customJD, companyName);
+
+  const interview = await Interview.create({
+    userId,
+    customJD,
+    companyName,
+    mode: mode || "text",
+    status: "in_progress",
+    messages: [
+      {
+        sender: "ai",
+        text: firstMessage,
+        timestamp: new Date(),
+      },
+    ],
+  });
+
+  return interview;
+};
+
 const addUserMessageAndReply = async ({ interviewId, userId, text }) => {
   const interview = await Interview.findOne({ _id: interviewId, userId }).populate("roleId");
   if (!interview) throw new AppError("Interview not found", 404);
@@ -38,31 +71,64 @@ const addUserMessageAndReply = async ({ interviewId, userId, text }) => {
     throw new AppError("Interview is already completed", 400);
   }
 
-  const prompt = await Prompt.findOne({ roleId: interview.roleId._id });
-  if (!prompt) throw new AppError("Prompt not found for this role", 404);
+  let systemInstruction;
+  let roleTitle;
+  let difficulty;
 
-  interview.messages.push({
+  if (interview.roleId) {
+    const prompt = await Prompt.findOne({ roleId: interview.roleId._id });
+    if (!prompt) throw new AppError("Prompt not found for this role", 404);
+    systemInstruction = prompt.systemInstruction;
+    roleTitle = interview.roleId.title;
+    difficulty = interview.roleId.difficulty;
+  } else {
+    systemInstruction = generateSystemInstructionForJD(interview.customJD, interview.companyName);
+    roleTitle = `Candidato para ${interview.companyName || "Empresa"}`;
+    difficulty = "Adaptativa (basada en JD)";
+  }
+
+  const userMessage = {
     sender: "user",
     text,
     timestamp: new Date(),
-  });
+  };
+
+  interview.messages.push(userMessage);
 
   const history = interview.messages.slice(-20).map((message) => ({
     sender: message.sender,
     text: message.text,
   }));
 
-  const aiText = await generateInterviewReply({
-    systemInstruction: prompt.systemInstruction,
-    history,
-    roleTitle: interview.roleId.title,
-    difficulty: interview.roleId.difficulty,
-  });
+  // Limit logic: If more than 10 messages (5 exchanges), tell AI to wrap up
+  const isWrappingUp = interview.messages.length >= 10;
+  if (isWrappingUp) {
+    systemInstruction += "\nIMPORTANTE: Hemos llegado al límite de preguntas. Por favor, realiza una última pregunta de cierre o despídete y dile al usuario que ya puede presionar el botón 'Finalizar' para ver su evaluación.";
+  }
+
+  // Run AI Reply and Sentiment Analysis in parallel
+  const [aiText, sentiment] = await Promise.all([
+    generateInterviewReply({
+      systemInstruction,
+      history,
+      roleTitle,
+      difficulty,
+    }),
+    generateSentimentAnalysis(text)
+  ]);
+
+  // Update user message with sentiment
+  userMessage.sentiment = sentiment;
 
   interview.messages.push({
     sender: "ai",
     text: aiText,
     timestamp: new Date(),
+  });
+
+  // Award XP for the message (10 XP per message)
+  await User.findByIdAndUpdate(userId, {
+    $inc: { xp: 10 }
   });
 
   await interview.save();
@@ -81,23 +147,60 @@ const completeInterview = async ({ interviewId, userId }) => {
     return interview;
   }
 
-  const prompt = await Prompt.findOne({ roleId: interview.roleId._id });
-  if (!prompt) throw new AppError("Prompt not found for this role", 404);
+  let systemInstruction;
+  let roleTitle;
+  let difficulty;
+
+  if (interview.roleId) {
+    const prompt = await Prompt.findOne({ roleId: interview.roleId._id });
+    if (!prompt) throw new AppError("Prompt not found for this role", 404);
+    systemInstruction = prompt.systemInstruction;
+    roleTitle = interview.roleId.title;
+    difficulty = interview.roleId.difficulty;
+  } else {
+    systemInstruction = generateSystemInstructionForJD(interview.customJD, interview.companyName);
+    roleTitle = `Candidato para ${interview.companyName || "Empresa"}`;
+    difficulty = "Adaptativa";
+  }
 
   const history = interview.messages.map((message) => ({
     sender: message.sender,
     text: message.text,
   }));
 
-  const feedback = await generateInterviewFeedback({
-    systemInstruction: prompt.systemInstruction,
-    history,
-    roleTitle: interview.roleId.title,
-    difficulty: interview.roleId.difficulty,
+  const [feedback, sentimentSummary] = await Promise.all([
+    generateInterviewFeedback({
+      systemInstruction,
+      history,
+      roleTitle,
+      difficulty,
+    }),
+    generateSentimentSummary(history)
+  ]);
+
+  interview.feedback = {
+    ...feedback,
+    sentimentSummary
+  };
+  interview.status = "completed";
+  
+  // Award completion XP (200 base + performance bonus)
+  const bonusXp = 200 + (feedback.overallScore * 2);
+  const user = await User.findById(userId);
+  if (user) {
+    user.xp += bonusXp;
+    user.level = calculateLevel(user.xp);
+    await user.save();
+  }
+
+  // Update Daily Tasks Progress
+  await updateTaskProgress(userId, {
+    technicalScore: feedback.technicalScore,
+    softSkillsScore: feedback.softSkillsScore,
+    overallScore: feedback.overallScore,
+    confidenceAverage: sentimentSummary?.confidenceAverage || 0
   });
 
-  interview.feedback = feedback;
-  interview.status = "completed";
   await interview.save();
 
   return interview;
@@ -184,17 +287,26 @@ const getUserProgress = async ({ userId }) => {
         },
     recent: recentCompleted.map((item) => ({
       interviewId: item._id,
-      roleTitle: item.roleId?.title || "Sin rol",
+      roleTitle: item.roleId?.title || (item.customJD ? "Vacante Personalizada" : "Sin rol"),
       technicalScore: item.feedback?.technicalScore ?? null,
       softSkillsScore: item.feedback?.softSkillsScore ?? null,
       overallScore: item.feedback?.overallScore ?? null,
       completedAt: item.updatedAt,
     })),
+    history: await Interview.find({
+      userId,
+      status: "completed",
+      feedback: { $ne: null },
+    })
+      .sort({ createdAt: 1 }) // Chronological order
+      .limit(20)
+      .select("createdAt feedback.overallScore feedback.technicalScore feedback.softSkillsScore"),
   };
 };
 
 module.exports = {
   startInterview,
+  startCustomInterview,
   addUserMessageAndReply,
   completeInterview,
   getInterviewById,

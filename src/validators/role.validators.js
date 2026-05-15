@@ -5,6 +5,8 @@ const roleBody = z.object({
   description: z.string().min(10).max(1200),
   tags: z.array(z.string().min(1).max(40)).default([]),
   difficulty: z.enum(["Fácil", "Intermedio", "Difícil"]),
+  systemInstruction: z.string().min(10).max(5000).optional(),
+  firstMessage: z.string().min(5).max(1000).optional(),
 });
 
 const createRoleSchema = z.object({

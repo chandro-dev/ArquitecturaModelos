@@ -40,6 +40,39 @@ const userSchema = new mongoose.Schema(
       type: Boolean,
       default: false,
     },
+    xp: {
+      type: Number,
+      default: 0,
+    },
+    level: {
+      type: Number,
+      default: 1,
+    },
+    achievements: {
+      type: [String],
+      default: [],
+    },
+    dailyTasks: {
+      type: [{
+        description: String,
+        type: { type: String }, // "score", "count", "mode"
+        targetValue: Number,
+        currentValue: { type: Number, default: 0 },
+        completed: { type: Boolean, default: false },
+        xpReward: { type: Number, default: 150 },
+        category: String // "técnico", "soft-skills", "confianza"
+      }],
+      default: [],
+    },
+    studyMissions: {
+      type: [{
+        topic: String,
+        description: String,
+        completed: { type: Boolean, default: false },
+        xpReward: { type: Number, default: 100 }
+      }],
+      default: [],
+    }
   },
   {
     timestamps: { createdAt: true, updatedAt: true },

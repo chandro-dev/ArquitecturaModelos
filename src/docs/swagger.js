@@ -192,6 +192,37 @@ const options = {
           },
         },
       },
+      "/api/auth/missions/{missionId}/toggle": {
+        patch: {
+          tags: ["Auth"],
+          summary: "Alternar estado de una misión técnica",
+          security: [{ bearerAuth: [] }],
+          parameters: [
+            {
+              in: "path",
+              name: "missionId",
+              required: true,
+              schema: { type: "string" },
+            },
+          ],
+          responses: {
+            200: { description: "Estado de misión actualizado" },
+            401: { description: "No autorizado" },
+            404: { description: "Misión no encontrada" },
+          },
+        },
+      },
+      "/api/auth/missions/refresh": {
+        post: {
+          tags: ["Auth"],
+          summary: "Regenerar misiones y plan de estudio con IA",
+          security: [{ bearerAuth: [] }],
+          responses: {
+            200: { description: "Misiones regeneradas exitosamente" },
+            401: { description: "No autorizado" },
+          },
+        },
+      },
       "/api/roles": {
         get: {
           tags: ["Roles"],
@@ -443,7 +474,7 @@ const options = {
       },
     },
   },
-  apis: [],
+  apis: ["./src/routes/*.js", "./src/models/*.js"],
 };
 
 const swaggerSpec = swaggerJsdoc(options);

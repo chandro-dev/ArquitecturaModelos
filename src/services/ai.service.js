@@ -148,7 +148,140 @@ const generateInterviewFeedback = async ({
   });
 };
 
+const generateSystemInstructionForJD = (jd, companyName) => {
+  return [
+    `Eres un reclutador experto para la empresa ${companyName || "una empresa líder"}.`,
+    "Tu objetivo es realizar una entrevista técnica y conductual basada en la siguiente Descripción de Puesto (JD):",
+    "---",
+    jd,
+    "---",
+    "Instrucciones:",
+    "1. Sé profesional pero natural.",
+    "2. Haz preguntas de una en una.",
+    "3. Si el candidato da respuestas vagas, repregunta para profundizar.",
+    "4. Evalúa tanto conocimientos técnicos como ajuste cultural.",
+  ].join("\n");
+};
+
+const generateInitialMessageForJD = async (jd, companyName) => {
+  const client = getGeminiClient();
+  const model = client.getGenerativeModel({
+    model: env.GEMINI_MODEL,
+    systemInstruction: generateSystemInstructionForJD(jd, companyName),
+  });
+
+  const prompt = "Genera un mensaje inicial de bienvenida para el candidato, presentándote y mencionando brevemente el puesto basado en el JD. Sé directo y profesional.";
+  
+  const result = await model.generateContent(prompt);
+  return result.response.text().trim();
+};
+
+const generateSentimentAnalysis = async (userText) => {
+  const client = getGeminiClient();
+  const model = client.getGenerativeModel({
+    model: env.GEMINI_MODEL,
+    systemInstruction: "Eres un psicólogo experto en comunicación no verbal y análisis de discurso para procesos de reclutamiento."
+  });
+
+  const prompt = [
+    "Analiza el sentimiento y tono de la siguiente respuesta de un candidato en una entrevista.",
+    "Devuelve solo JSON válido.",
+    "Estructura:",
+    '{ "label": "Seguro|Dudoso|Nervioso|Neutral", "score": 0-100, "tone": "string breve" }',
+    "",
+    `Respuesta: "${userText}"`
+  ].join("\n");
+
+  try {
+    const result = await model.generateContent(prompt);
+    const raw = result.response.text().trim();
+    const jsonStr = extractJsonObject(raw);
+    return JSON.parse(jsonStr || raw);
+  } catch (_error) {
+    return { label: "Neutral", score: 50, tone: "Análisis no disponible" };
+  }
+};
+
+const generateSentimentSummary = async (history) => {
+  const client = getGeminiClient();
+  const model = client.getGenerativeModel({
+    model: env.GEMINI_MODEL,
+    systemInstruction: "Analista de comportamiento profesional."
+  });
+
+  const transcript = serializeTranscript(history);
+  const prompt = [
+    "Basado en la siguiente entrevista, genera un resumen emocional del candidato.",
+    "Devuelve solo JSON válido.",
+    "Estructura:",
+    '{ "predominantEmotion": "string", "confidenceAverage": 0-100, "emotionalEvolution": number[] (lista de scores de confianza por cada mensaje del usuario) }',
+    "",
+    "Transcripción:",
+    transcript
+  ].join("\n");
+
+  try {
+    const result = await model.generateContent(prompt);
+    const raw = result.response.text().trim();
+    const jsonStr = extractJsonObject(raw);
+    return JSON.parse(jsonStr || raw);
+  } catch (_error) {
+    return { predominantEmotion: "Neutral", confidenceAverage: 50, emotionalEvolution: [] };
+  }
+};
+
+const generateMissionsWithAI = async (history, preferences) => {
+  const client = getGeminiClient();
+  const model = client.getGenerativeModel({
+    model: env.GEMINI_MODEL,
+    systemInstruction: "Eres un coach de carrera experto que genera misiones diarias para mejorar habilidades de entrevista."
+  });
+
+  const transcript = history && history.length > 0 ? serializeTranscript(history) : "Sin entrevistas previas.";
+  const prompt = [
+    "Basado en este historial de entrevistas y preferencias, genera un paquete de crecimiento profesional.",
+    `Preferencias: ${JSON.stringify(preferences)}`,
+    "Devuelve solo JSON válido.",
+    "Estructura:",
+    "{",
+    '  "dailyTasks": [ { "description": "string", "type": "score_technical|score_confidence|count", "targetValue": number, "xpReward": number, "category": "string" } ],',
+    '  "studyPlan": [ { "topic": "string", "description": "string", "xpReward": number } ]',
+    "}",
+    "",
+    "Historial:",
+    transcript
+  ].join("\n");
+
+  try {
+    const result = await model.generateContent(prompt);
+    const raw = result.response.text().trim();
+    const jsonStr = extractJsonObject(raw);
+    const data = JSON.parse(jsonStr || raw);
+    
+    // Ensure we have the right structure
+    return {
+      dailyTasks: data.dailyTasks || [],
+      studyPlan: data.studyPlan || []
+    };
+  } catch (_error) {
+    // Fallback static missions if AI fails
+    return {
+      dailyTasks: [
+        { description: "Completa una entrevista técnica", type: "count", targetValue: 1, xpReward: 100, category: "Básico" }
+      ],
+      studyPlan: [
+        { topic: "Optimización de React", description: "Estudia el uso de useMemo y useCallback para mejorar el rendimiento.", xpReward: 100 }
+      ]
+    };
+  }
+};
+
 module.exports = {
   generateInterviewReply,
   generateInterviewFeedback,
+  generateSystemInstructionForJD,
+  generateInitialMessageForJD,
+  generateSentimentAnalysis,
+  generateSentimentSummary,
+  generateMissionsWithAI,
 };
