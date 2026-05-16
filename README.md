@@ -1,97 +1,97 @@
-# Interview Role-Play Simulator Backend
+# 🧠 Interview AI - Backend Studio Inteligente
 
-Backend profesional en `Node.js + Express + MongoDB` para simular entrevistas de trabajo con IA (OpenAI o Gemini), guardar historial y calcular retroalimentación detallada.
+Bienvenido al núcleo de **Interview AI**, una plataforma de simulación de entrevistas de alto rendimiento impulsada por Inteligencia Artificial (Google Gemini). Este backend está diseñado bajo una arquitectura robusta, escalable y orientada a la gamificación del aprendizaje profesional.
 
-## Stack
+---
 
-- Express 5
-- Mongoose (MongoDB Atlas)
-- JWT + bcrypt (autenticación)
-- Zod (validación de payloads)
-- OpenAI / Gemini (proveedor IA configurable)
+## 🏛️ Arquitectura del Sistema
 
-## Estructura
+El proyecto sigue un patrón de **Capas (Layered Architecture)** para asegurar la separación de responsabilidades:
 
-```txt
-src/
-  app.js
-  server.js
-  config/
-  controllers/
-  middlewares/
-  models/
-  routes/
-  services/
-  validators/
-  scripts/
-```
+1.  **Routes**: Definición de endpoints y orquestación de middlewares.
+2.  **Controllers**: Manejo de peticiones HTTP, validación de entrada (Zod) y gestión de respuestas.
+3.  **Services**: Capa de lógica de negocio pura. Aquí reside la integración con Gemini AI y el motor de gamificación.
+4.  **Models**: Esquemas de datos persistentes usando Mongoose (MongoDB).
+5.  **Utils/Middlewares**: Funciones compartidas (JWT, Error Handling, Auth).
 
-## Configuración
+---
 
-1. Copiar variables:
+## 🛠️ Stack Tecnológico
 
-```bash
-cp .env.example .env
-```
+- **Runtime**: Node.js v18+
+- **Framework**: Express.js
+- **Base de Datos**: MongoDB (Mongoose ODM)
+- **IA Engine**: Google Generative AI (Gemini Pro)
+- **Seguridad**: JWT (JSON Web Tokens) & BcryptJS
+- **Validación**: Zod
+- **Documentación**: Swagger UI
 
-2. Ajustar `.env`:
+---
 
-- `MONGODB_URI` (ya incluye tu conexión)
-- `MONGODB_DB_NAME=interviewapp`
-- `JWT_SECRET` largo y seguro
-- `AI_PROVIDER=openai` o `AI_PROVIDER=gemini`
-- API Key según proveedor elegido
+## 📊 Modelo de Datos (Esquemas Principales)
 
-## Ejecución
+### 👤 User
+Gestiona la identidad y el progreso del candidato.
+- **Identidad**: Email (unique), Password (hashed).
+- **Gamificación**: 
+  - `xp`: Puntos de experiencia acumulados.
+  - `level`: Rango actual (Junior a Staff Engineer).
+- **Misiones**: 
+  - `dailyTasks`: Objetivos automáticos basados en desempeño.
+  - `studyMissions`: Ruta de aprendizaje técnica generada por IA.
 
-```bash
-npm install
-npm run dev
-```
+### 📝 Interview
+Almacena las sesiones de práctica.
+- **Messages**: Historial de chat con metadatos de `sentiment` (Confianza, Tono).
+- **Feedback**: Análisis técnico, Soft Skills y `sentimentSummary`.
+- **Status**: pending, completed.
 
-Servidor: `http://localhost:4000`
+### 🎭 Role
+Roles predefinidos para las entrevistas (ej: React Developer, Backend Engineer).
 
+<<<<<<< HEAD
 Healthcheck: `GET /api/health`
 OpenAPI JSON: `GET /api/openapi.json`
 Swagger UI: `GET /api-docs`
+=======
+---
+>>>>>>> 283628565f4cd912a623475139c8e17cb7559932
 
-## Seed inicial (roles + prompts)
+## 🚀 Funcionalidades Core
 
-```bash
-npm run seed
-```
+### 1. Motor de Entrevista Adaptativo
+Utiliza Gemini AI para generar preguntas contextuales basadas en el Job Description (JD) o el Rol seleccionado. Procesa respuestas en tiempo real.
 
-## Endpoints principales
+### 2. Análisis de Sentimiento (Real-time)
+Cada respuesta del usuario es analizada para detectar:
+- **Nivel de Confianza** (0-100%).
+- **Tono Emocional** (Seguro, Dudoso, Nervioso).
 
-### Auth
+### 3. Sistema de Gamificación
+- **XP**: Se otorga por cada mensaje enviado y por completar entrevistas con buen puntaje.
+- **Misiones Diarias**: Tareas generadas por IA que desafían al usuario a mejorar sus debilidades.
+- **Learning Path**: Temas técnicos sugeridos que el usuario marca manualmente al dominarlos.
 
-- `POST /api/auth/register`
-- `POST /api/auth/login`
-- `GET /api/auth/me`
-- `PATCH /api/auth/me/preferences`
+---
 
-### Roles
+## 🛣️ API Endpoints (Resumen)
 
-- `GET /api/roles`
-- `GET /api/roles/:roleId`
-- `POST /api/roles` (admin)
-- `PATCH /api/roles/:roleId` (admin)
-- `DELETE /api/roles/:roleId` (admin)
-
-### Prompts
-
-- `GET /api/prompts/:roleId` (admin)
-- `PUT /api/prompts/:roleId` (admin)
+### Auth & User
+- `POST /api/auth/register`: Registro de nuevos talentos.
+- `POST /api/auth/login`: Autenticación y generación de tareas.
+- `GET /api/auth/me`: Perfil completo con XP y misiones.
+- `PATCH /api/auth/missions/:id/toggle`: Marcar tema técnico como aprendido.
+- `POST /api/auth/missions/refresh`: Regenerar plan de estudio con IA.
 
 ### Interviews
+- `POST /api/interviews/start`: Iniciar nueva sesión.
+- `POST /api/interviews/:id/message`: Enviar respuesta y recibir feedback emocional.
+- `POST /api/interviews/:id/complete`: Finalizar y recibir reporte detallado.
+- `GET /api/interviews/me/history`: Historial de desempeño.
 
-- `POST /api/interviews/start`
-- `POST /api/interviews/:interviewId/message`
-- `POST /api/interviews/:interviewId/complete`
-- `GET /api/interviews/:interviewId`
-- `GET /api/interviews/me/history?page=1&limit=10&status=completed`
-- `GET /api/interviews/me/progress`
+---
 
+<<<<<<< HEAD
 ## Swagger / OpenAPI
 
 - Toda la documentacion esta en Swagger UI: `http://localhost:4000/api-docs`
@@ -102,20 +102,24 @@ npm run seed
   - Validar contratos request/response para Angular.
 
 ## Estructura de feedback guardada
+=======
+## ⚙️ Configuración del Entorno (.env)
+>>>>>>> 283628565f4cd912a623475139c8e17cb7559932
 
-```json
-{
-  "technicalScore": 75,
-  "softSkillsScore": 85,
-  "overallScore": 80,
-  "strengths": ["..."],
-  "improvements": ["..."],
-  "generalComment": "..."
-}
+```env
+PORT=4000
+MONGODB_URI=mongodb://localhost:27017/interviewapp
+JWT_SECRET=tu_secreto_super_seguro
+GEMINI_API_KEY=tu_google_gemini_key
+GEMINI_MODEL=gemini-1.5-pro
 ```
 
-## Notas de seguridad
+---
 
-- No expongas API Keys en Angular; solo en backend.
-- Rotar credenciales si fueron compartidas en texto plano.
-- Para operar como admin, marca `isAdmin: true` en el usuario en MongoDB.
+## 📈 Próximos Pasos
+- [ ] Implementación de WebSockets para feedback emocional instantáneo.
+- [ ] Integración de Speech-to-Text (STT) para entrevistas por voz.
+- [ ] Sistema de Medallas (Achievements) persistente.
+
+---
+*Desarrollado con ❤️ para la nueva generación de ingenieros.*

@@ -1,6 +1,7 @@
 const asyncHandler = require("../utils/asyncHandler");
 const {
   startInterview,
+  startCustomInterview,
   addUserMessageAndReply,
   completeInterview,
   getInterviewById,
@@ -12,6 +13,16 @@ const start = asyncHandler(async (req, res) => {
   const interview = await startInterview({
     userId: req.user._id,
     roleId: req.validated.body.roleId,
+    mode: req.validated.body.mode || req.user.preferences?.preferredMode || "text",
+  });
+  res.status(201).json(interview);
+});
+
+const startCustom = asyncHandler(async (req, res) => {
+  const interview = await startCustomInterview({
+    userId: req.user._id,
+    customJD: req.validated.body.customJD,
+    companyName: req.validated.body.companyName,
     mode: req.validated.body.mode || req.user.preferences?.preferredMode || "text",
   });
   res.status(201).json(interview);
@@ -67,6 +78,7 @@ const myProgress = asyncHandler(async (req, res) => {
 
 module.exports = {
   start,
+  startCustom,
   sendMessage,
   complete,
   byId,

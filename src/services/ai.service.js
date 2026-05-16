@@ -1,18 +1,8 @@
-const OpenAI = require("openai");
 const { GoogleGenerativeAI } = require("@google/generative-ai");
 const env = require("../config/env");
 const AppError = require("../utils/AppError");
 
-let openaiClient;
 let geminiClient;
-
-const getOpenAIClient = () => {
-  if (!env.OPENAI_API_KEY) {
-    throw new AppError("OPENAI_API_KEY is missing in environment", 500);
-  }
-  if (!openaiClient) openaiClient = new OpenAI({ apiKey: env.OPENAI_API_KEY });
-  return openaiClient;
-};
 
 const getGeminiClient = () => {
   if (!env.GEMINI_API_KEY) {
@@ -24,19 +14,11 @@ const getGeminiClient = () => {
 
 const serializeTranscript = (history) =>
   history
-    .map((msg) => `${msg.sender === "ai" ? "ENTREVISTADOR" : "CANDIDATO"}: ${msg.text}`)
+    .map(
+      (msg) =>
+        `${msg.sender === "ai" ? "ENTREVISTADOR" : "CANDIDATO"}: ${msg.text}`,
+    )
     .join("\n");
-
-const toOpenAIMessages = (systemInstruction, history) => {
-  const messages = [{ role: "system", content: systemInstruction }];
-  for (const msg of history) {
-    messages.push({
-      role: msg.sender === "ai" ? "assistant" : "user",
-      content: msg.text,
-    });
-  }
-  return messages;
-};
 
 const clampScore = (value) => Math.max(0, Math.min(100, Number(value) || 0));
 
@@ -63,7 +45,9 @@ const normalizeFeedback = (feedback) => {
     improvements: Array.isArray(feedback.improvements)
       ? feedback.improvements.filter(Boolean).map(String).slice(0, 10)
       : [],
-    generalComment: feedback.generalComment ? String(feedback.generalComment) : "",
+    generalComment: feedback.generalComment
+      ? String(feedback.generalComment)
+      : "",
   };
 };
 
@@ -72,25 +56,18 @@ const parseFeedbackFromText = (text) => {
     return normalizeFeedback(JSON.parse(text));
   } catch (_error) {
     const maybeJson = extractJsonObject(text);
-    if (!maybeJson) throw new AppError("AI feedback response is not valid JSON", 502);
+    if (!maybeJson)
+      throw new AppError("AI feedback response is not valid JSON", 502);
     return normalizeFeedback(JSON.parse(maybeJson));
   }
 };
 
-const generateReplyWithOpenAI = async ({ systemInstruction, history }) => {
-  const client = getOpenAIClient();
-  const completion = await client.chat.completions.create({
-    model: env.OPENAI_MODEL,
-    temperature: 0.7,
-    messages: toOpenAIMessages(systemInstruction, history),
-  });
-
-  const answer = completion.choices?.[0]?.message?.content?.trim();
-  if (!answer) throw new AppError("OpenAI returned empty response", 502);
-  return answer;
-};
-
-const generateReplyWithGemini = async ({ systemInstruction, history, roleTitle, difficulty }) => {
+const generateReplyWithGemini = async ({
+  systemInstruction,
+  history,
+  roleTitle,
+  difficulty,
+}) => {
   const client = getGeminiClient();
   const model = client.getGenerativeModel({
     model: env.GEMINI_MODEL,
@@ -114,44 +91,12 @@ const generateReplyWithGemini = async ({ systemInstruction, history, roleTitle, 
   return answer;
 };
 
-const generateFeedbackWithOpenAI = async ({ systemInstruction, history, roleTitle, difficulty }) => {
-  const client = getOpenAIClient();
-  const transcript = serializeTranscript(history);
-
-  const completion = await client.chat.completions.create({
-    model: env.OPENAI_MODEL,
-    temperature: 0.2,
-    response_format: { type: "json_object" },
-    messages: [
-      {
-        role: "system",
-        content: `${systemInstruction}
-
-Evalúa el desempeño del candidato en una entrevista de trabajo para ${roleTitle} (${difficulty}).
-Responde únicamente JSON válido con esta estructura:
-{
-  "technicalScore": 0-100,
-  "softSkillsScore": 0-100,
-  "overallScore": 0-100,
-  "strengths": ["..."],
-  "improvements": ["..."],
-  "generalComment": "..."
-}
-`,
-      },
-      {
-        role: "user",
-        content: `Transcripción de la entrevista:\n${transcript}`,
-      },
-    ],
-  });
-
-  const raw = completion.choices?.[0]?.message?.content?.trim();
-  if (!raw) throw new AppError("OpenAI returned empty feedback", 502);
-  return parseFeedbackFromText(raw);
-};
-
-const generateFeedbackWithGemini = async ({ systemInstruction, history, roleTitle, difficulty }) => {
+const generateFeedbackWithGemini = async ({
+  systemInstruction,
+  history,
+  roleTitle,
+  difficulty,
+}) => {
   const client = getGeminiClient();
   const model = client.getGenerativeModel({
     model: env.GEMINI_MODEL,
@@ -175,21 +120,168 @@ const generateFeedbackWithGemini = async ({ systemInstruction, history, roleTitl
   return parseFeedbackFromText(raw);
 };
 
-const generateInterviewReply = async ({ systemInstruction, history, roleTitle, difficulty }) => {
-  if (env.AI_PROVIDER === "openai") {
-    return generateReplyWithOpenAI({ systemInstruction, history });
-  }
-  return generateReplyWithGemini({ systemInstruction, history, roleTitle, difficulty });
+const generateInterviewReply = async ({
+  systemInstruction,
+  history,
+  roleTitle,
+  difficulty,
+}) => {
+  return generateReplyWithGemini({
+    systemInstruction,
+    history,
+    roleTitle,
+    difficulty,
+  });
 };
 
-const generateInterviewFeedback = async ({ systemInstruction, history, roleTitle, difficulty }) => {
-  if (env.AI_PROVIDER === "openai") {
-    return generateFeedbackWithOpenAI({ systemInstruction, history, roleTitle, difficulty });
+const generateInterviewFeedback = async ({
+  systemInstruction,
+  history,
+  roleTitle,
+  difficulty,
+}) => {
+  return generateFeedbackWithGemini({
+    systemInstruction,
+    history,
+    roleTitle,
+    difficulty,
+  });
+};
+
+const generateSystemInstructionForJD = (jd, companyName) => {
+  return [
+    `Eres un reclutador experto para la empresa ${companyName || "una empresa líder"}.`,
+    "Tu objetivo es realizar una entrevista técnica y conductual basada en la siguiente Descripción de Puesto (JD):",
+    "---",
+    jd,
+    "---",
+    "Instrucciones:",
+    "1. Sé profesional pero natural.",
+    "2. Haz preguntas de una en una.",
+    "3. Si el candidato da respuestas vagas, repregunta para profundizar.",
+    "4. Evalúa tanto conocimientos técnicos como ajuste cultural.",
+  ].join("\n");
+};
+
+const generateInitialMessageForJD = async (jd, companyName) => {
+  const client = getGeminiClient();
+  const model = client.getGenerativeModel({
+    model: env.GEMINI_MODEL,
+    systemInstruction: generateSystemInstructionForJD(jd, companyName),
+  });
+
+  const prompt = "Genera un mensaje inicial de bienvenida para el candidato, presentándote y mencionando brevemente el puesto basado en el JD. Sé directo y profesional.";
+  
+  const result = await model.generateContent(prompt);
+  return result.response.text().trim();
+};
+
+const generateSentimentAnalysis = async (userText) => {
+  const client = getGeminiClient();
+  const model = client.getGenerativeModel({
+    model: env.GEMINI_MODEL,
+    systemInstruction: "Eres un psicólogo experto en comunicación no verbal y análisis de discurso para procesos de reclutamiento."
+  });
+
+  const prompt = [
+    "Analiza el sentimiento y tono de la siguiente respuesta de un candidato en una entrevista.",
+    "Devuelve solo JSON válido.",
+    "Estructura:",
+    '{ "label": "Seguro|Dudoso|Nervioso|Neutral", "score": 0-100, "tone": "string breve" }',
+    "",
+    `Respuesta: "${userText}"`
+  ].join("\n");
+
+  try {
+    const result = await model.generateContent(prompt);
+    const raw = result.response.text().trim();
+    const jsonStr = extractJsonObject(raw);
+    return JSON.parse(jsonStr || raw);
+  } catch (_error) {
+    return { label: "Neutral", score: 50, tone: "Análisis no disponible" };
   }
-  return generateFeedbackWithGemini({ systemInstruction, history, roleTitle, difficulty });
+};
+
+const generateSentimentSummary = async (history) => {
+  const client = getGeminiClient();
+  const model = client.getGenerativeModel({
+    model: env.GEMINI_MODEL,
+    systemInstruction: "Analista de comportamiento profesional."
+  });
+
+  const transcript = serializeTranscript(history);
+  const prompt = [
+    "Basado en la siguiente entrevista, genera un resumen emocional del candidato.",
+    "Devuelve solo JSON válido.",
+    "Estructura:",
+    '{ "predominantEmotion": "string", "confidenceAverage": 0-100, "emotionalEvolution": number[] (lista de scores de confianza por cada mensaje del usuario) }',
+    "",
+    "Transcripción:",
+    transcript
+  ].join("\n");
+
+  try {
+    const result = await model.generateContent(prompt);
+    const raw = result.response.text().trim();
+    const jsonStr = extractJsonObject(raw);
+    return JSON.parse(jsonStr || raw);
+  } catch (_error) {
+    return { predominantEmotion: "Neutral", confidenceAverage: 50, emotionalEvolution: [] };
+  }
+};
+
+const generateMissionsWithAI = async (history, preferences) => {
+  const client = getGeminiClient();
+  const model = client.getGenerativeModel({
+    model: env.GEMINI_MODEL,
+    systemInstruction: "Eres un coach de carrera experto que genera misiones diarias para mejorar habilidades de entrevista."
+  });
+
+  const transcript = history && history.length > 0 ? serializeTranscript(history) : "Sin entrevistas previas.";
+  const prompt = [
+    "Basado en este historial de entrevistas y preferencias, genera un paquete de crecimiento profesional.",
+    `Preferencias: ${JSON.stringify(preferences)}`,
+    "Devuelve solo JSON válido.",
+    "Estructura:",
+    "{",
+    '  "dailyTasks": [ { "description": "string", "type": "score_technical|score_confidence|count", "targetValue": number, "xpReward": number, "category": "string" } ],',
+    '  "studyPlan": [ { "topic": "string", "description": "string", "xpReward": number } ]',
+    "}",
+    "",
+    "Historial:",
+    transcript
+  ].join("\n");
+
+  try {
+    const result = await model.generateContent(prompt);
+    const raw = result.response.text().trim();
+    const jsonStr = extractJsonObject(raw);
+    const data = JSON.parse(jsonStr || raw);
+    
+    // Ensure we have the right structure
+    return {
+      dailyTasks: data.dailyTasks || [],
+      studyPlan: data.studyPlan || []
+    };
+  } catch (_error) {
+    // Fallback static missions if AI fails
+    return {
+      dailyTasks: [
+        { description: "Completa una entrevista técnica", type: "count", targetValue: 1, xpReward: 100, category: "Básico" }
+      ],
+      studyPlan: [
+        { topic: "Optimización de React", description: "Estudia el uso de useMemo y useCallback para mejorar el rendimiento.", xpReward: 100 }
+      ]
+    };
+  }
 };
 
 module.exports = {
   generateInterviewReply,
   generateInterviewFeedback,
+  generateSystemInstructionForJD,
+  generateInitialMessageForJD,
+  generateSentimentAnalysis,
+  generateSentimentSummary,
+  generateMissionsWithAI,
 };

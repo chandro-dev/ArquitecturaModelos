@@ -9,6 +9,16 @@ const startInterviewSchema = z.object({
   query: z.object({}).optional(),
 });
 
+const startCustomInterviewSchema = z.object({
+  body: z.object({
+    customJD: z.string().min(50).max(10000),
+    companyName: z.string().min(2).max(100).optional(),
+    mode: z.enum(["text", "voice"]).optional(),
+  }),
+  params: z.object({}).optional(),
+  query: z.object({}).optional(),
+});
+
 const sendMessageSchema = z.object({
   body: z.object({
     text: z.string().min(1).max(4000),
@@ -47,6 +57,7 @@ const listInterviewsSchema = z.object({
 
 module.exports = {
   startInterviewSchema,
+  startCustomInterviewSchema,
   sendMessageSchema,
   completeInterviewSchema,
   interviewIdParamSchema,
